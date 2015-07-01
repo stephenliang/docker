@@ -360,39 +360,48 @@ func (d *driver) CreateNetwork(id types.UUID, option map[string]interface{}) err
 
 func (d *driver) DeleteNetwork(nid types.UUID) error {
 	var err error
+        logrus.Warnf("Deleting network")
 
 	// Get network handler and remove it from driver
+        logrus.Warnf("Locking driver")
 	d.Lock()
 	n := d.network
 	d.network = nil
 	d.Unlock()
+        logrus.Warnf("Unlocking driver")
 
 	// On failure set network handler back in driver, but
 	// only if is not already taken over by some other thread
 	defer func() {
 		if err != nil {
+                        logrus.Warnf("Deferred Locking driver")
 			d.Lock()
 			if d.network == nil {
 				d.network = n
 			}
 			d.Unlock()
+                        logrus.Warnf("Deferred UnLocking driver")
 		}
 	}()
 
 	// Sanity check
 	if n == nil {
+                logrus.Warnf("No network detected")
 		err = driverapi.ErrNoNetwork(nid)
 		return err
 	}
 
 	// Cannot remove network if endpoints are still present
 	if len(n.endpoints) != 0 {
+                logrus.Warnf("Endpoints are still present")
 		err = ActiveEndpointsError(n.id)
 		return err
 	}
 
 	// Programming
+        logrus.Warnf("Deleting link")
 	err = netlink.LinkDel(n.bridge.Link)
+        logrus.Warnf("Done Deleting link")
 
 	return err
 }
@@ -767,21 +776,26 @@ func (d *driver) Join(nid, eid types.UUID, sboxKey string, jinfo driverapi.JoinI
 
 // Leave method is invoked when a Sandbox detaches from an endpoint.
 func (d *driver) Leave(nid, eid types.UUID) error {
+  logrus.Warnf("Attempting to leave the network")
 	network, err := d.getNetwork(nid)
 	if err != nil {
+    logrus.Warnf("An error occurred")
 		return err
 	}
 
 	endpoint, err := network.getEndpoint(eid)
 	if err != nil {
+    logrus.Warnf("An error occurred 2")
 		return err
 	}
 
 	if endpoint == nil {
+    logrus.Warnf("Unable to find endpoint")
 		return EndpointNotFoundError(eid)
 	}
 
 	if !network.config.EnableICC {
+    logrus.Warnf("attempting to unlink")
 		return d.link(network, endpoint, nil, false)
 	}
 
